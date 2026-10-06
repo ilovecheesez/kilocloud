@@ -419,9 +419,7 @@ describe('SandboxContainers launch', () => {
     container.running = true;
     container.destroyBehavior = 'reject';
 
-    await expect(launch(instance, REF_B)).rejects.toBeInstanceOf(
-      ContainersAllocationConflictError
-    );
+    await expect(launch(instance, REF_B)).rejects.toBeInstanceOf(ContainersAllocationConflictError);
     expect(container.startCalls).toHaveLength(0);
     expect(readRecord()).toMatchObject({ state: 'stopping', allocationRef: REF_A });
   });
