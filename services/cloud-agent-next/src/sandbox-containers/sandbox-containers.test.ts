@@ -398,6 +398,34 @@ describe('SandboxContainers launch', () => {
     expect(container.inspectCalls).toBe(0);
   });
 
+  it('finishes an unconfirmed predecessor stop before starting a new allocation ref', async () => {
+    const { instance, container, readRecord } = setup({
+      record: { ...idleRecord, state: 'stopping', allocationRef: REF_A },
+    });
+    container.running = true;
+
+    const result = await launch(instance, REF_B);
+
+    expect(result).toEqual({ started: true, startSource: 'image' });
+    expect(container.destroyCalls).toBe(1);
+    expect(container.startCalls).toHaveLength(1);
+    expect(readRecord()).toMatchObject({ state: 'running', allocationRef: REF_B });
+  });
+
+  it('rejects the launch and keeps the pending stop when the predecessor destroy fails', async () => {
+    const { instance, container, readRecord } = setup({
+      record: { ...idleRecord, state: 'stopping', allocationRef: REF_A },
+    });
+    container.running = true;
+    container.destroyBehavior = 'reject';
+
+    await expect(launch(instance, REF_B)).rejects.toBeInstanceOf(
+      ContainersAllocationConflictError
+    );
+    expect(container.startCalls).toHaveLength(0);
+    expect(readRecord()).toMatchObject({ state: 'stopping', allocationRef: REF_A });
+  });
+
   it('installs the Kilo and git outbound proxy before a contained native start', async () => {
     const { instance, container } = setup();
     attachOutbound(instance);

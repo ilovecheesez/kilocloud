@@ -270,11 +270,16 @@ export class SandboxContainers extends DurableObject<Env> {
   async launchWrapper(input: ContainersLaunchInput): Promise<ContainersLaunchResult> {
     return this.runExclusive(async () => {
       const ref = input.allocationRef;
-      const stored = await this.readRecord();
-      if (stored.allocationRef !== null && stored.allocationRef !== ref) {
-        throw new ContainersAllocationConflictError(ref);
+      let stored = await this.readRecord();
+      // A stop that never confirmed leaves the record `stopping` with the
+      // predecessor's ref. A successor launch owns the sandbox now, so it must
+      // finish that stop instead of conflicting with it forever.
+      if (stored.state === 'stopping') {
+        const stop = await this.finishStop(stored);
+        if (stop !== 'terminal') throw new ContainersAllocationConflictError(ref);
+        stored = await this.readRecord();
       }
-      if (stored.allocationRef === ref && stored.state === 'stopping') {
+      if (stored.allocationRef !== null && stored.allocationRef !== ref) {
         throw new ContainersAllocationConflictError(ref);
       }
       return this.launchEntry(stored, ref, input);
