@@ -398,6 +398,18 @@ describe('SandboxContainers launch', () => {
     expect(container.inspectCalls).toBe(0);
   });
 
+  it('rejects a same-ref launch that races its own stop', async () => {
+    const { instance, container, readRecord } = setup({
+      record: { ...idleRecord, state: 'stopping', allocationRef: REF_A },
+    });
+    container.running = true;
+
+    await expect(launch(instance, REF_A)).rejects.toBeInstanceOf(ContainersAllocationConflictError);
+    expect(container.destroyCalls).toBe(0);
+    expect(container.startCalls).toHaveLength(0);
+    expect(readRecord()).toMatchObject({ state: 'stopping', allocationRef: REF_A });
+  });
+
   it('finishes an unconfirmed predecessor stop before starting a new allocation ref', async () => {
     const { instance, container, readRecord } = setup({
       record: { ...idleRecord, state: 'stopping', allocationRef: REF_A },

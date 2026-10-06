@@ -271,10 +271,14 @@ export class SandboxContainers extends DurableObject<Env> {
     return this.runExclusive(async () => {
       const ref = input.allocationRef;
       let stored = await this.readRecord();
-      // A stop that never confirmed leaves the record `stopping` with the
-      // predecessor's ref. A successor launch owns the sandbox now, so it must
-      // finish that stop instead of conflicting with it forever.
-      if (stored.state === 'stopping') {
+      // A same-ref launch that races this record's own stop stays failed-closed;
+      // only a successor (new ref) may finish a stop that never confirmed. A
+      // stop that timed out leaves the record `stopping` with the predecessor's
+      // ref, and every successor retry would otherwise conflict with it forever.
+      if (stored.allocationRef === ref && stored.state === 'stopping') {
+        throw new ContainersAllocationConflictError(ref);
+      }
+      if (stored.state === 'stopping' && stored.allocationRef !== null) {
         const stop = await this.finishStop(stored);
         if (stop !== 'terminal') throw new ContainersAllocationConflictError(ref);
         stored = await this.readRecord();
