@@ -739,15 +739,28 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     home: string,
     setStep: (step: ControlPlanePreparationStep) => void
   ): Promise<ControlPlaneWorkspaceOutcome> {
+    const workspaceStartedAt = Date.now();
+    const inspectStartedAt = Date.now();
     const { inspection, stamp: previous } = await inspectWorkspace(directory);
+    log(
+      `control-plane workspace inspect session=${spec.sessionId} inspection=${inspection} elapsedMs=${Date.now() - inspectStartedAt}`
+    );
     if (inspection === 'same') return 'same';
     let adopted = false;
     if (inspection === 'foreign') {
+      const clearStartedAt = Date.now();
       await clearStaleHomes(homeRoot, home).catch(() => undefined);
+      log(
+        `control-plane workspace stale homes cleared session=${spec.sessionId} elapsedMs=${Date.now() - clearStartedAt}`
+      );
       // A snapshot at the generation cap that is due again is not adopted: it is
       // rebuilt from a clone, so the layers stacked on it do not accumulate.
       const rebuild = previous !== null && snapshotAction(previous, now()) === 'rebuild';
+      const adoptStartedAt = Date.now();
       adopted = !rebuild && (await adoptWorkspace(spec, directory, env, redact, setStep));
+      log(
+        `control-plane workspace adopt done session=${spec.sessionId} adopted=${adopted} rebuild=${rebuild} elapsedMs=${Date.now() - adoptStartedAt}`
+      );
       if (!adopted) await emptyDirectory(directory);
     }
     // A clone happens only when there is no repository yet; a partly prepared
@@ -770,6 +783,9 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       setStep('snapshot');
       await captureWorkspace(spec, directory, env, commit);
     }
+    log(
+      `control-plane workspace prepared session=${spec.sessionId} outcome=${adopted ? 'adopted' : 'cloned'} elapsedMs=${Date.now() - workspaceStartedAt}`
+    );
     return adopted ? 'adopted' : 'cloned';
   }
 
@@ -928,6 +944,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       targets: credentials?.proxy?.targets ?? kiloConfig.targets,
     };
     const home = homeFor(homeKey(spec), directory, homeRoot);
+    log(`control-plane prepare received session=${sessionId} directory=${directory}`);
 
     try {
       // Built inside the failure scope: an over-limit CLI config must surface as
