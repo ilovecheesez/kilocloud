@@ -158,8 +158,17 @@ export type KiloRestartReason = KiloRestartFaultReason | 'credentials';
 export type KiloRestartInfo = {
   directory: string;
   reason: KiloRestartReason;
+  trigger?: HealthRestartTrigger;
   interruptedExecutions?: ExecutionIdentity[];
 };
+
+/**
+ * Kilo stopped answering: no health answer, a stalled stream or observation, or an unconfirmed
+ * abort. A hang restart for exhausted activity capacity is not one; Kilo was answering.
+ */
+export function isUnresponsiveRestart(info: Pick<KiloRestartInfo, 'reason' | 'trigger'>): boolean {
+  return info.reason === 'hang' && info.trigger !== 'activity_capacity';
+}
 
 /**
  * The runtime's one lifecycle phase. `running` is healthy, `suspected` has seen
@@ -334,7 +343,7 @@ type HealthProbeObservation = {
   httpStatus?: number;
 };
 
-type HealthRestartTrigger =
+export type HealthRestartTrigger =
   | 'health_probe_false'
   | 'sse_reconnect_budget'
   | 'process_exit'
@@ -1014,7 +1023,12 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
       });
     }
     try {
-      options.onRestart?.({ directory: options.directory, reason, interruptedExecutions });
+      options.onRestart?.({
+        directory: options.directory,
+        reason,
+        ...(trigger === undefined ? {} : { trigger }),
+        interruptedExecutions,
+      });
     } catch (error) {
       log(
         `control-plane kilo restart handler failed directory=${options.directory} error=${
