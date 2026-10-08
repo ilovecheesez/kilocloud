@@ -1014,6 +1014,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
     onRuntimeRestart(info: KiloRestartInfo & { key: string }): void {
       const ownedTurns = new Set(turnsForRuntimeKey(info.key).map(turn => turn.route.sessionId));
       void publishCommandsForRuntimeKey(info.key);
+      const failure = info.reason === 'hang' ? 'agent_unresponsive' : 'agent_restarted';
       for (const turn of turnsForRuntimeKey(info.key)) {
         turn.deferredCompletion = undefined;
         if (turn.phase === 'finalizing') {
@@ -1022,7 +1023,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
             // started; the restart interrupted its Kilo work, so fail it
             // instead of letting it end as no_progress.
             turn.stepAbort?.abort(new Error('agent restarted'));
-            sendOutcome(turn, 'failed', 'agent_restarted');
+            sendOutcome(turn, 'failed', failure);
           }
           // Otherwise let finalization finish; a later idle triggers it again.
           continue;
@@ -1053,7 +1054,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
           drainInbox(turn);
           continue;
         }
-        sendOutcome(turn, 'failed', 'agent_restarted');
+        sendOutcome(turn, 'failed', failure);
       }
       const reported = new Set<string>();
       for (const execution of info.interruptedExecutions ?? []) {
@@ -1069,9 +1070,11 @@ export function createTurnManager(deps: TurnManagerDeps) {
             type: 'session.error',
             properties: {
               sessionID: execution.sessionId,
-              reason: 'agent_restarted',
+              reason: failure,
               error:
-                'Execution stopped because the agent restarted. You can continue in this chat.',
+                failure === 'agent_unresponsive'
+                  ? 'Execution stopped because Kilo was not responding and was restarted. You can continue in this chat.'
+                  : 'Execution stopped because the agent restarted. You can continue in this chat.',
             },
           },
         ]);

@@ -136,6 +136,7 @@ const cases: ReadonlyArray<
   ],
   ['sandbox_lost', 'accepted', 'failed', 'post_dispatch_no_activity', 'wrapper_disconnected'],
   ['agent_restarted', 'accepted', 'failed', 'post_dispatch_no_activity', 'wrapper_disconnected'],
+  ['agent_unresponsive', 'accepted', 'failed', 'post_dispatch_no_activity', 'wrapper_disconnected'],
   ['no_progress', 'accepted', 'failed', 'post_dispatch_no_activity', 'wrapper_no_output'],
   ['no_outcome', 'accepted', 'failed', 'post_dispatch_no_activity', 'wrapper_no_output'],
   [

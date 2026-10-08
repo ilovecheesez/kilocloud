@@ -109,6 +109,7 @@ export function classifyControlPlaneFailure(
     case 'connection_lost':
     case 'sandbox_lost':
     case 'agent_restarted':
+    case 'agent_unresponsive':
       return POST_DISPATCH_WRAPPER_DISCONNECTED;
     case 'no_progress':
     case 'no_outcome':
