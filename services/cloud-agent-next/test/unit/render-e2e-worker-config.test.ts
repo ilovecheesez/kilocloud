@@ -321,7 +321,6 @@ describe('buildE2eWorkerConfig', () => {
     expect(config.vars.TOOL_CGROUP_MODE).toBe('enforce');
     expect(config.vars.TOOL_CGROUP_RESERVE_MB).toBe('1024');
     expect(config.vars.TOOL_CGROUP_CPU_WEIGHT).toBe('50');
-    expect(config.vars.CONTROL_PLANE_IDS).toBe('user-1');
     expect(config.vars.WORKTREE_CREATION_ENABLED_IDS).toBe('user-1');
     expect(config.vars.CLOUD_AGENT_CONTAINER_BILLING_ENABLED).toBe('false');
     expect(config.vars.CLOUD_AGENT_CONTAINER_BILLING_USER_IDS).toBe('');
@@ -344,9 +343,8 @@ describe('buildE2eWorkerConfig', () => {
     expect(JSON.stringify(config)).not.toContain('E2E_SURFACE_USER_IDS');
   });
 
-  it('enrols every authenticated user only for an explicit *', () => {
+  it('enrols worktree creation for every authenticated user only for an explicit *', () => {
     const config = buildE2eWorkerConfig(readSourceConfig(), { ...overrides, e2eUserId: ' * ' });
-    expect(config.vars.CONTROL_PLANE_IDS).toBe('*');
     expect(config.vars.WORKTREE_CREATION_ENABLED_IDS).toBe('*');
   });
 

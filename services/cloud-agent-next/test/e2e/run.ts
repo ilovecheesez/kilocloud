@@ -41,7 +41,7 @@ import {
 } from './auth.js';
 import { DEFAULT_CONFIG, type ApiVersion, type DriverConfig } from './client.js';
 import { bootstrapDeployedProfile, fetchStreamTicket, type DeployedAuth } from './deployed-auth.js';
-import { isControlPlaneOwner, isWorktreeOwner } from '../../src/session-plane.js';
+import { isWorktreeOwner } from '../../src/session-plane.js';
 import type { LifecycleResult } from './lifecycle.js';
 import { runSharedScenario, resolveScenarioApi, type Profile } from './scenario-capabilities.js';
 import { SHARED_SCENARIOS, type SharedScenario } from './scenarios-shared.js';
@@ -54,9 +54,9 @@ import { createLocalHttpScenarioEnvironment } from './e2e-surface-client.js';
 
 /**
  * Local runs that create a control-plane worktree session, so the driver owner
- * must be enrolled in `CONTROL_PLANE_IDS` and `WORKTREE_CREATION_ENABLED_IDS`.
- * Derived from the shared definitions' `requiresWorktreeCreation` flag, so a
- * converted scenario cannot silently skip the enrollment precheck.
+ * must be enrolled in `WORKTREE_CREATION_ENABLED_IDS`. Derived from the shared
+ * definitions' `requiresWorktreeCreation` flag, so a converted scenario cannot
+ * silently skip the enrollment precheck.
  */
 export const WORKTREE_ENROLLMENT_SCENARIOS: ReadonlySet<string> = new Set(
   Object.values(SHARED_SCENARIOS)
@@ -318,20 +318,13 @@ async function runLocal(parsed: ParsedArgs): Promise<void> {
     : await ensureTestUser(process.env.DATABASE_URL, email, {
         funded: process.env.E2E_FUNDED === '1',
       });
-  const expectControlPlane = Boolean(devVars.CONTROL_PLANE_IDS?.trim());
+  const expectControlPlane = true;
   const requiresWorktreeEnrollment = WORKTREE_ENROLLMENT_SCENARIOS.has(lifecycle);
-  if (
-    requiresWorktreeEnrollment &&
-    (!isControlPlaneOwner(devVars, { userId: user.id }) ||
-      !isWorktreeOwner(devVars, { userId: user.id }))
-  ) {
+  if (requiresWorktreeEnrollment && !isWorktreeOwner(devVars, { userId: user.id })) {
     throw new Error(
-      `${lifecycle} requires the E2E user to be enrolled in CONTROL_PLANE_IDS and WORKTREE_CREATION_ENABLED_IDS ` +
+      `${lifecycle} requires the E2E user to be enrolled in WORKTREE_CREATION_ENABLED_IDS ` +
         'in the Worker .dev.vars; no session was started'
     );
-  }
-  if (expectControlPlane && !isControlPlaneOwner(devVars, { userId: user.id })) {
-    throw new Error('The E2E user is not enrolled in CONTROL_PLANE_IDS; no session was started');
   }
   console.log(
     `driver user: ${user.id} (${user.email}); api=${api}; controlPlane=${expectControlPlane}`

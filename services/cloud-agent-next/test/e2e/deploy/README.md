@@ -161,7 +161,7 @@ script never falls back to another token and never prints the token value.
 
 | Name | Required | Meaning |
 |---|---|---|
-| `E2E_USER_ID` | yes | Required. The Kilo user id enrolled in `CONTROL_PLANE_IDS` and `WORKTREE_CREATION_ENABLED_IDS`. The deployed test Worker writes to production Postgres and R2, so pass `*` only as a deliberate opt-in to enrol every authenticated Kilo user. |
+| `E2E_USER_ID` | yes | Required. The Kilo user id enrolled in `WORKTREE_CREATION_ENABLED_IDS`. The deployed test Worker writes to production Postgres and R2, so pass `*` only as a deliberate opt-in to enrol every authenticated Kilo user. |
 | `E2E_AUTH_FILE` | no | Optional mode-600 JSON file for a deployed run: `{ token, userId?, email?, fakeLlmAdminToken?, e2eInternalApiSecret? }`. Supplies the user token when `E2E_USER_TOKEN` is unset or empty, and the identity (`userId` derived from the token when omitted; `email` optional). `deploy-fake-llm.sh` reads its `fakeLlmAdminToken` field when `FAKE_LLM_ADMIN_TOKEN` is unset or empty; `deploy-e2e-worker.sh` and the deployed driver read its `e2eInternalApiSecret` field when `E2E_INTERNAL_API_SECRET` is unset or empty. |
 | `E2E_USER_TOKEN` | no | An ordinary personal Kilo API token for the driver, presented verbatim. Takes precedence over the auth file's `token` field and needs no separate `userId`/`email`. Not read by `deploy-fake-llm.sh`. |
 | `E2E_INTERNAL_API_SECRET` | required for the deployed driver; optional for deploy | Value uploaded as the `cloud-agent-e2e-test` Worker's `INTERNAL_API_SECRET` secret when a source supplies it, and always presented by the driver as both the surface key and the internal tRPC key. Needed for the first deploy or a rotation; a redeploy without it keeps the deployed value. When unset or empty, both `deploy-e2e-worker.sh` and the deployed driver resolve it from the `E2E_AUTH_FILE`'s `e2eInternalApiSecret` field. The shared `requireE2eInternalSecret` rules require at least 16 characters, no whitespace, and not the development default; the dotenv alphabet `[A-Za-z0-9._~-]` is a local-renderer concern only, so a base64 value is accepted here. Must differ from production's `INTERNAL_API_SECRET` (an operator requirement the scripts cannot prove). |
@@ -249,7 +249,7 @@ metadata has no credential containment, so `getSandboxNamespace` reads
 there. Those scenarios cannot reach a removed binding. The
 worktree/worktree-creation flags this needs are already rendered
 into the deployed e2e Worker config:
-`WORKTREE_CREATION_ENABLED_IDS`/`CONTROL_PLANE_IDS` default to `*`
+`WORKTREE_CREATION_ENABLED_IDS` defaults to `*`
 (`E2E_USER_ID`), so the four new scenarios need no additional render change.
 
 Code-review `crv-{hash}`, isolated-standard `istd-{hash}` and shared
@@ -301,8 +301,7 @@ touched again.
 
 ## Deploy-safety notes
 
-- `CONTROL_PLANE_IDS` and `WORKTREE_CREATION_ENABLED_IDS` are feature flags,
-  not authentication.
+- `WORKTREE_CREATION_ENABLED_IDS` is a feature flag, not authentication.
 - The fake's model routes are public but require a valid Kilo JWT; its `/test/*`
   routes require the admin token. A leaked admin token exposes only the test
   side channel (gate release, counters, scenario status), not billing or

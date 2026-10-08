@@ -426,7 +426,6 @@ describe('explicit sandbox session creation', () => {
   function selectedContext(doStub = makeDoStub()) {
     const ctx = makeContext(doStub);
     Object.assign(ctx.env, vercel, {
-      CONTROL_PLANE_IDS: orgId,
       SANDBOX_SELECTION_IDS: orgId,
       PER_SESSION_SANDBOX_ORG_IDS: '*',
       VERCEL_SANDBOX_ORG_IDS: '*',
@@ -521,7 +520,6 @@ describe('explicit sandbox session creation', () => {
     async ({ preset, sandboxId }) => {
       const doStub = makeDoStub();
       const ctx = selectedContext(doStub);
-      ctx.env.CONTROL_PLANE_IDS = '';
       generateSessionIdMock.mockReturnValue(CLOUD_AGENT_SESSION_ID);
       await runCreate(ctx, requestForPreset(preset));
       expect(generateSessionIdMock).toHaveBeenCalledWith('legacy');
@@ -537,7 +535,6 @@ describe('explicit sandbox session creation', () => {
     async preset => {
       const doStub = makeDoStub();
       const ctx = selectedContext(doStub);
-      ctx.env.CONTROL_PLANE_IDS = '';
       ctx.env.VERCEL_SANDBOX_ORG_IDS = '';
       await runCreate(ctx, requestForPreset(preset));
       expect(generateSessionIdMock).toHaveBeenCalledWith('control');
@@ -742,7 +739,6 @@ describe('explicit sandbox session creation', () => {
       const doStub = makeDoStub();
       const ctx = selectedContext(doStub);
       ctx.env.SANDBOX_SELECTION_IDS = '';
-      ctx.env.CONTROL_PLANE_IDS = '';
       ctx.env.WORKTREE_CREATION_ENABLED_IDS = '';
       getPgDbMock.mockReturnValue(makeDb([[{ id: 'member' }], [row]]));
       admitOperationMock.mockResolvedValue({ admission: 'duplicate_settled', row });
@@ -785,7 +781,6 @@ describe('explicit sandbox session creation', () => {
       const doStub = makeDoStub();
       const ctx = selectedContext(doStub);
       ctx.env.SANDBOX_SELECTION_IDS = '';
-      ctx.env.CONTROL_PLANE_IDS = '';
       ctx.env.WORKTREE_CREATION_ENABLED_IDS = '';
       getPgDbMock.mockReturnValue(
         makeDb([[{ id: 'member' }], [row], [], [{ email: 'test@example.com' }]])
@@ -833,7 +828,6 @@ describe('explicit sandbox session creation', () => {
     const doStub = makeDoStub();
     const ctx = selectedContext(doStub);
     ctx.env.SANDBOX_SELECTION_IDS = '';
-    ctx.env.CONTROL_PLANE_IDS = '';
     ctx.env.WORKTREE_CREATION_ENABLED_IDS = '';
     getPgDbMock.mockReturnValue(makeDb([[], [{ email: 'test@example.com' }]]));
     admitOperationMock.mockResolvedValue({ admission: 'duplicate_reconcile_pending', row });
@@ -873,7 +867,6 @@ describe('explicit sandbox session creation', () => {
       const doStub = makeDoStub();
       const ctx = selectedContext(doStub);
       ctx.env.SANDBOX_SELECTION_IDS = '';
-      ctx.env.CONTROL_PLANE_IDS = '';
       ctx.env.VERCEL_TOKEN = '';
       getPgDbMock.mockReturnValue(makeDb([[{ id: 'member' }], [row]]));
       admitOperationMock.mockResolvedValue({ admission: 'duplicate_settled', row });
@@ -901,7 +894,6 @@ describe('explicit sandbox session creation', () => {
     const doStub = makeDoStub();
     const ctx = selectedContext(doStub);
     ctx.env.SANDBOX_SELECTION_IDS = '';
-    ctx.env.CONTROL_PLANE_IDS = '';
     ctx.env.VERCEL_TOKEN = '';
     getPgDbMock.mockReturnValue(makeDb([[{ id: 'member' }], [row]]));
     admitOperationMock.mockResolvedValue({ admission: 'duplicate_settled', row });
@@ -958,7 +950,6 @@ describe('explicit sandbox session creation', () => {
     const doStub = makeDoStub();
     const ctx = selectedContext(doStub);
     ctx.env.SANDBOX_SELECTION_IDS = orgId;
-    ctx.env.CONTROL_PLANE_IDS = '*';
     getPgDbMock.mockReturnValue(makeDb([[]]));
     await expect(
       runCreate(ctx, makeRequest({ runtime: { sandboxAllocation: 'cloudflare-single' } }))
@@ -973,7 +964,6 @@ describe('explicit sandbox session creation', () => {
       const doStub = makeDoStub();
       const ctx = selectedContext(doStub);
       ctx.env.SANDBOX_SELECTION_IDS = allowlist;
-      ctx.env.CONTROL_PLANE_IDS = '*';
       generateSessionIdMock.mockReturnValue(CLOUD_AGENT_SESSION_ID);
       getPgDbMock.mockReturnValue(makeDb([[{ email: 'test@example.com' }]]));
       admitOperationMock.mockResolvedValue({
@@ -1030,7 +1020,6 @@ describe('explicit sandbox session creation', () => {
     const doStub = makeDoStub();
     const ctx = selectedContext(doStub);
     ctx.env.SANDBOX_SELECTION_IDS = '';
-    ctx.env.CONTROL_PLANE_IDS = '';
     getPgDbMock.mockReturnValue(
       makeDb([[{ id: 'member' }], [row], [], [{ email: 'test@example.com' }]])
     );
@@ -1426,7 +1415,7 @@ describe('createSessionWithLedger admission ladder', () => {
         runtime: { sandboxAllocation: 'isolated-standard' },
         options: {
           operationKey: OPERATION_KEY,
-          createdOnPlatform: 'webhook',
+          createdOnPlatform: 'auto-triage',
           kilocodeOrganizationId: orgId,
         },
       })
@@ -1442,7 +1431,7 @@ describe('createSessionWithLedger admission ladder', () => {
     );
     expect(createdMetadata(doStub)).toMatchObject(
       expect.objectContaining({
-        identity: expect.objectContaining({ orgId, createdOnPlatform: 'webhook' }),
+        identity: expect.objectContaining({ orgId, createdOnPlatform: 'auto-triage' }),
         workspace: expect.objectContaining({
           sandboxId,
           sandboxProvider: 'cloudflare',
@@ -1452,13 +1441,13 @@ describe('createSessionWithLedger admission ladder', () => {
     );
   });
 
-  it('replays a settled organization Standard allocation after enrollment is removed', async () => {
+  it('replays a settled organization Standard allocation', async () => {
     const orgId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
     const input = makeRequest({
       runtime: { sandboxAllocation: 'isolated-standard' },
       options: {
         operationKey: OPERATION_KEY,
-        createdOnPlatform: 'webhook',
+        createdOnPlatform: 'auto-triage',
         kilocodeOrganizationId: orgId,
       },
     });
@@ -1527,7 +1516,6 @@ describe('createSessionWithLedger admission ladder', () => {
     async finalization => {
       const doStub = makeDoStub();
       const ctx = makeContext(doStub);
-      ctx.env.CONTROL_PLANE_IDS = '*';
       ctx.env.WORKTREE_CREATION_ENABLED_IDS = '*';
       generateSessionIdMock.mockReturnValue(WORKSPACE_SESSION_ID);
       const request = makeRequest({
@@ -1591,7 +1579,6 @@ describe('createSessionWithLedger admission ladder', () => {
     async worktreeIds => {
       const doStub = makeDoStub();
       const ctx = makeContext(doStub);
-      ctx.env.CONTROL_PLANE_IDS = '*';
       if (worktreeIds !== undefined) ctx.env.WORKTREE_CREATION_ENABLED_IDS = worktreeIds;
       generateSessionIdMock.mockReturnValue(WORKSPACE_SESSION_ID);
 
@@ -1635,7 +1622,6 @@ describe('createSessionWithLedger admission ladder', () => {
     async ({ worktreeEnabled, autoCommit }) => {
       const doStub = makeDoStub();
       const ctx = makeContext(doStub);
-      ctx.env.CONTROL_PLANE_IDS = '*';
       ctx.env.WORKTREE_CREATION_ENABLED_IDS = worktreeEnabled ? '*' : '';
       generateSessionIdMock.mockReturnValue(WORKSPACE_SESSION_ID);
       const request = makeRequest({
@@ -1731,7 +1717,6 @@ describe('createSessionWithLedger admission ladder', () => {
       });
       const doStub = makeDoStub();
       const ctx = makeContext(doStub);
-      ctx.env.CONTROL_PLANE_IDS = '';
       ctx.env.WORKTREE_CREATION_ENABLED_IDS = worktreeEnabled === false ? '*' : '';
 
       await expect(runCreate(ctx, request)).resolves.toEqual({
@@ -1755,7 +1740,6 @@ describe('createSessionWithLedger admission ladder', () => {
     });
     const doStub = makeDoStub();
     const ctx = { ...makeContext(doStub), userId };
-    ctx.env.CONTROL_PLANE_IDS = organizationId;
     ctx.env.WORKTREE_CREATION_ENABLED_IDS = organizationId;
     generateSessionIdMock.mockReturnValue(WORKSPACE_SESSION_ID);
 
@@ -1786,15 +1770,14 @@ describe('createSessionWithLedger admission ladder', () => {
 
   it.each([
     ['missing platform', undefined, undefined],
-    ['automation origin', 'browser', 'scheduled'],
-    ['integration origin', 'browser', 'slack'],
+    ['app-builder origin', 'browser', 'app-builder'],
+    ['auto-triage origin', 'browser', 'auto-triage'],
     ['code-review origin', undefined, 'code-review'],
   ] as const)(
-    'keeps enrolled %s creates on agent_ sessions',
+    'keeps non-control-plane %s creates on agent_ sessions',
     async (_label, clientProvenance, createdOnPlatform) => {
       const doStub = makeDoStub();
       const ctx = makeContext(doStub);
-      ctx.env.CONTROL_PLANE_IDS = '*';
       ctx.env.WORKTREE_CREATION_ENABLED_IDS = '*';
 
       await runCreate(
@@ -1814,6 +1797,31 @@ describe('createSessionWithLedger admission ladder', () => {
   );
 
   it.each([
+    ['scheduled origin', 'scheduled'],
+    ['integration origin', 'slack'],
+    ['webhook origin', 'webhook'],
+  ] as const)('routes %s creates to workspace_ sessions', async (_label, createdOnPlatform) => {
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
+    ctx.env.WORKTREE_CREATION_ENABLED_IDS = '*';
+    generateSessionIdMock.mockReturnValue(WORKSPACE_SESSION_ID);
+
+    await runCreate(
+      ctx,
+      makeRequest({
+        options: { operationKey: OPERATION_KEY, createdOnPlatform, clientProvenance: 'browser' },
+      })
+    );
+
+    expect(generateSessionIdMock).toHaveBeenCalledWith('control');
+    expect(createdMetadata(doStub)).toMatchObject(
+      expect.objectContaining({
+        identity: expect.objectContaining({ sessionId: WORKSPACE_SESSION_ID }),
+      })
+    );
+  });
+
+  it.each([
     ['missing provenance', undefined, 'cloud-agent-web'],
     ['mobile provenance', 'mobile', 'cloud-agent-web'],
     ['automation origin', 'browser', 'scheduled'],
@@ -1823,7 +1831,6 @@ describe('createSessionWithLedger admission ladder', () => {
     async (_label, clientProvenance, createdOnPlatform) => {
       const doStub = makeDoStub();
       const ctx = makeContext(doStub);
-      ctx.env.CONTROL_PLANE_IDS = '*';
       ctx.env.WORKTREE_CREATION_ENABLED_IDS = '*';
       generateSessionIdMock.mockReturnValue(WORKSPACE_SESSION_ID);
 
@@ -1853,7 +1860,6 @@ describe('createSessionWithLedger admission ladder', () => {
     async (_label, runtime, botId) => {
       const doStub = makeDoStub();
       const ctx = { ...makeContext(doStub), ...(botId ? { botId } : {}) };
-      ctx.env.CONTROL_PLANE_IDS = '*';
       ctx.env.WORKTREE_CREATION_ENABLED_IDS = '*';
       generateSessionIdMock.mockReturnValue(WORKSPACE_SESSION_ID);
 
@@ -1883,7 +1889,6 @@ describe('createSessionWithLedger admission ladder', () => {
   it('does not group browser requests without a stable request operation key', async () => {
     const doStub = makeDoStub();
     const ctx = makeContext(doStub);
-    ctx.env.CONTROL_PLANE_IDS = '*';
     ctx.env.WORKTREE_CREATION_ENABLED_IDS = '*';
     generateSessionIdMock.mockReturnValue(WORKSPACE_SESSION_ID);
 
@@ -3060,7 +3065,6 @@ describe('createSessionWithLedger worktree rollout and ownership reconciliation'
 
   function context(doStub: ReturnType<typeof makeDoStub>): SessionRegistrationContext {
     const ctx = makeContext(doStub);
-    ctx.env.CONTROL_PLANE_IDS = '*';
     ctx.env.WORKTREE_CREATION_ENABLED_IDS = '*';
     return ctx;
   }
@@ -3499,7 +3503,6 @@ describe('createSessionWithLedger worktree rollout and ownership reconciliation'
       const input = request({ finalization: { autoCommit, condenseOnComplete: true } });
       const doStub = makeDoStub({ getMetadata: vi.fn().mockResolvedValue(null) });
       const ctx = context(doStub);
-      ctx.env.CONTROL_PLANE_IDS = '';
       ctx.env.WORKTREE_CREATION_ENABLED_IDS = '';
       const storedProgress = await canonicalProgress(input, {
         ...(worktreeEnabled !== undefined
@@ -4299,7 +4302,6 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
     const sandboxSessionIdFromName = vi.spyOn(ctx.env.SANDBOX_SESSION, 'idFromName');
     const sandboxSessionGet = vi.spyOn(ctx.env.SANDBOX_SESSION, 'get');
     const cloudAgentSessionGet = vi.spyOn(ctx.env.CLOUD_AGENT_SESSION, 'get');
-    ctx.env.CONTROL_PLANE_IDS = USER_ID;
 
     await expect(runCreate(ctx, cloneWebRequest())).resolves.toEqual({
       cloudAgentSessionId: WORKSPACE_SESSION_ID,
@@ -4331,7 +4333,6 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
     generateSessionIdMock.mockReturnValue(WORKSPACE_SESSION_ID);
     const doStub = makeDoStub();
     const ctx = makeContext(doStub);
-    ctx.env.CONTROL_PLANE_IDS = USER_ID;
 
     await expect(
       runCreate(
@@ -4355,13 +4356,12 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
     expect(admitOperationMock).not.toHaveBeenCalled();
   });
 
-  it('allows isolated Standard allocation for enrolled non-interactive sessions', async () => {
+  it('allows isolated Standard allocation for non-interactive legacy sessions', async () => {
     const orgId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
     const sandboxId = `istd-${'a'.repeat(48)}` as const;
     generateSandboxRoutingTargetMock.mockResolvedValueOnce({ kind: 'isolated', sandboxId });
     const doStub = makeDoStub();
     const ctx = makeContext(doStub);
-    ctx.env.CONTROL_PLANE_IDS = USER_ID;
     ctx.env.SANDBOX_SELECTION_IDS = orgId;
     getPgDbMock.mockReturnValue(
       makeDb([[{ id: 'member' }], [{ id: 'member' }], [{ email: 'test@example.com' }]])
@@ -4377,7 +4377,7 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
         runtime: { sandboxAllocation: 'isolated-standard' },
         options: {
           operationKey: OPERATION_KEY,
-          createdOnPlatform: 'slack',
+          createdOnPlatform: 'auto-triage',
           kilocodeOrganizationId: orgId,
         },
       })
@@ -4395,7 +4395,6 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
   it('routes an enrolled Code Reviewer owner to the control plane via the trusted billing origin', async () => {
     const doStub = makeDoStub();
     const ctx = makeContext(doStub);
-    ctx.env.CONTROL_PLANE_IDS = '';
     ctx.env.CODE_REVIEW_CONTROL_PLANE_IDS = USER_ID;
     generateSessionIdMock.mockReturnValue(WORKSPACE_SESSION_ID);
 
@@ -4415,10 +4414,9 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
     );
   });
 
-  it('keeps a Code Reviewer owner on the legacy plane when only CONTROL_PLANE_IDS is enrolled', async () => {
+  it('keeps a Code Reviewer session on the legacy plane without code-review enrollment', async () => {
     const doStub = makeDoStub();
     const ctx = makeContext(doStub);
-    ctx.env.CONTROL_PLANE_IDS = USER_ID;
     ctx.env.CODE_REVIEW_CONTROL_PLANE_IDS = '';
     generateSessionIdMock.mockReturnValue(CLOUD_AGENT_SESSION_ID);
 
@@ -4919,24 +4917,21 @@ describe('createSessionWithLedger clone reconciliation', () => {
     {
       sessionId: WORKSPACE_SESSION_ID,
       sandboxProvider: 'vercel',
-      controlPlaneIds: undefined,
       expected: { github: true, gitlab: false, bitbucket: false, kilocode: true },
     },
     {
       sessionId: WORKSPACE_SESSION_ID,
       sandboxProvider: 'cloudflare',
-      controlPlaneIds: '',
       expected: { github: true, gitlab: false, bitbucket: false, kilocode: true },
     },
     {
       sessionId: CLOUD_AGENT_SESSION_ID,
       sandboxProvider: 'cloudflare',
-      controlPlaneIds: USER_ID,
       expected: { github: true, gitlab: false, bitbucket: false, kilocode: true },
     },
   ])(
-    'resumes $sandboxProvider clone containment from the stored $sessionId, not current owner enrollment',
-    async ({ sessionId, sandboxProvider, controlPlaneIds, expected }) => {
+    'resumes $sandboxProvider clone containment from the stored $sessionId, not the current plane',
+    async ({ sessionId, sandboxProvider, expected }) => {
       const request = cloneRequest();
       admitOperationMock.mockResolvedValueOnce({
         admission: 'takeover',
@@ -4949,7 +4944,6 @@ describe('createSessionWithLedger clone reconciliation', () => {
       getPgDbMock.mockReturnValue(makeDb([[], [{ email: 'test@example.com' }]]));
       const doStub = makeDoStub();
       const ctx = makeContext(doStub);
-      ctx.env.CONTROL_PLANE_IDS = controlPlaneIds;
 
       await expect(runCreate(ctx, request)).resolves.toEqual({
         cloudAgentSessionId: sessionId,

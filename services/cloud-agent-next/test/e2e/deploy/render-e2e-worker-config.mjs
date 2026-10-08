@@ -88,7 +88,7 @@ export function buildE2eWorkerConfig(sourceConfig, overrides) {
   const e2eUserId = overrides.e2eUserId?.trim();
   if (!e2eUserId) {
     throw new Error(
-      'E2E_USER_ID is required: this render enrolls it in CONTROL_PLANE_IDS and ' +
+      'E2E_USER_ID is required: this render enrolls it in ' +
         'WORKTREE_CREATION_ENABLED_IDS, and the e2e Worker writes to production ' +
         'Postgres and R2. Pass an explicit Kilo user id; pass * only to ' +
         'deliberately enrol every authenticated Kilo user.'
@@ -164,7 +164,6 @@ export function buildE2eWorkerConfig(sourceConfig, overrides) {
     TOOL_CGROUP_MODE: 'enforce',
     TOOL_CGROUP_RESERVE_MB: '1024',
     TOOL_CGROUP_CPU_WEIGHT: '50',
-    CONTROL_PLANE_IDS: e2eUserId,
     WORKTREE_CREATION_ENABLED_IDS: e2eUserId,
     CLOUD_AGENT_CONTAINER_BILLING_ENABLED: 'false',
     CLOUD_AGENT_CONTAINER_BILLING_USER_IDS: '',
@@ -364,8 +363,7 @@ export function renderLocal({
 if (isMain) {
   const isLocal = process.argv.includes('--local');
   // Only the deployed render consumes it, as the enrollment id for
-  // CONTROL_PLANE_IDS / WORKTREE_CREATION_ENABLED_IDS. It no longer authorizes
-  // the surface.
+  // WORKTREE_CREATION_ENABLED_IDS. It no longer authorizes the surface.
   const e2eUserId = process.env.E2E_USER_ID;
   if (isLocal) {
     try {

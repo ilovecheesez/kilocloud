@@ -13,7 +13,8 @@ cloud-agent-next refactor.
 
 1. Copy `.dev.vars.example` → `.dev.vars` and fill in local values.
    Leave `KILO_OPENROUTER_BASE` pointed at local Next.js (`@url nextjs/api`).
-   For control-plane scenarios, enroll the E2E user in `CONTROL_PLANE_IDS`.
+   Control-plane scenarios need no extra enrollment: interactive
+   `cloud-agent-web` creates always route to the control plane.
    The worktree-creating scenarios (`worktree-chat`, `worktree-multi-chat`,
    `long-conversation`, `leave-and-return`, `large-stream`, `concurrent-chats`,
    `interrupt-then-continue`, `question-idle-resume`, and the five `sandboxFaults`
@@ -811,9 +812,8 @@ wrapper (`kilocode-control-plane-wrapper.js`) uniquely in the owned container an
 returns its identity; a legacy container has no such process, so `proveNewPlane`
 throws and an opted-in run against a still-legacy plane fails loudly instead of
 false-passing. `prepareBrowserSession` already sets `createdOnPlatform:
-'cloud-agent-web'`, so once the driver is enrolled in `CONTROL_PLANE_IDS` and C1
-lands, the cutover routes these sessions to the new plane; the scenario does not
-need a separate create path.
+'cloud-agent-web'`, so once C1 lands, the cutover routes these sessions to the
+new plane; the scenario does not need a separate create path.
 
 | Lifecycle | What it does |
 |---|---|
