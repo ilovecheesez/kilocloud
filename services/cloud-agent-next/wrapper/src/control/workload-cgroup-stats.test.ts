@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'bun:test';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { readWorkloadStats } from './workload-cgroup.js';
+import { createWorkloadReporter, readWorkloadStats } from './workload-cgroup.js';
 
 const directories: string[] = [];
 
@@ -12,7 +12,7 @@ afterEach(() => {
 });
 
 describe('readWorkloadStats', () => {
-  it('reads CPU, I/O, pressure, and memory-limit counters without process content', () => {
+  it('reads CPU, I/O, pressure, memory-split, and memory-limit counters without process content', () => {
     const directory = mkdtempSync(path.join(tmpdir(), 'workload-stats-'));
     directories.push(directory);
     writeFileSync(path.join(directory, 'memory.current'), '1024\n');
@@ -26,6 +26,10 @@ describe('readWorkloadStats', () => {
       'some avg10=0 total=50\nfull avg10=0 total=20\n'
     );
     writeFileSync(
+      path.join(directory, 'memory.stat'),
+      'anon 600\nfile 300\nkernel 50\nshmem 120\nfile_mapped 40\n'
+    );
+    writeFileSync(
       path.join(directory, 'cpu.stat'),
       'usage_usec 900\nnr_throttled 3\nthrottled_usec 75\n'
     );
@@ -37,6 +41,9 @@ describe('readWorkloadStats', () => {
     expect(readWorkloadStats(directory)).toEqual({
       currentBytes: 1024,
       peakBytes: 2048,
+      anonBytes: 600,
+      fileBytes: 300,
+      shmemBytes: 120,
       memoryMaxEvents: 4,
       memoryOomEvents: 2,
       oomKills: 1,
@@ -49,5 +56,19 @@ describe('readWorkloadStats', () => {
       ioReadBytes: 130,
       ioWriteBytes: 240,
     });
+  });
+});
+
+describe('createWorkloadReporter', () => {
+  it('reports a stats record when only a per-child counter changes', () => {
+    const reported: Array<Record<string, unknown>> = [];
+    const reporter = createWorkloadReporter((_event, fields) => reported.push(fields));
+    const stats = { phase: 'completed', workloadPhase: 'stats', currentBytes: 100 } as const;
+
+    reporter.emit('scope', { ...stats, toolCurrentBytes: 60, serverCurrentBytes: 40 });
+    reporter.emit('scope', { ...stats, toolCurrentBytes: 60, serverCurrentBytes: 40 });
+    reporter.emit('scope', { ...stats, toolCurrentBytes: 30, serverCurrentBytes: 70 });
+
+    expect(reported.map(fields => fields.serverCurrentBytes)).toEqual([40, 70]);
   });
 });

@@ -50,9 +50,11 @@ import {
   WORKLOAD_SWEEP_INTERVAL_MS,
   WORKLOAD_TOOLS_NAME,
   writeOomScoreAdj,
+  type ServerMemoryProtection,
   type WorkloadPlacement,
   type WorkloadProcessEntry,
 } from './workload-cgroup.js';
+import { workloadStatsFields } from './workload-stats-fields.js';
 
 export type DirectProcessState = 'absent' | 'reused' | 'alive' | 'unknown';
 
@@ -105,6 +107,7 @@ type Cgroup = {
     toolsProcs: number;
     serverProcs: number;
     cpuController: boolean;
+    serverProtection: ServerMemoryProtection;
   };
 };
 
@@ -469,7 +472,7 @@ function createManagedCgroup(placement: WorkloadPlacement): Cgroup | undefined {
     const serverReference = `/proc/self/fd/${serverFd}`;
     const toolsReference = `/proc/self/fd/${toolsFd}`;
 
-    const { cpuController } = applyManagedWorkloadLimits({
+    const { cpuController, serverProtection } = applyManagedWorkloadLimits({
       parentReference: reference,
       serverReference,
       toolsReference,
@@ -504,7 +507,14 @@ function createManagedCgroup(placement: WorkloadPlacement): Cgroup | undefined {
       descriptors,
       procs,
       procsReference: serverReference,
-      managed: { serverReference, toolsReference, toolsProcs, serverProcs: procs, cpuController },
+      managed: {
+        serverReference,
+        toolsReference,
+        toolsProcs,
+        serverProcs: procs,
+        cpuController,
+        serverProtection,
+      },
       ...(kill !== undefined ? { kill } : {}),
     };
   } catch (error) {
@@ -756,40 +766,8 @@ export function createOwnedProcessScope(placement?: WorkloadPlacement): OwnedPro
         toolCount: toolPids.length,
         serverCount: serverPids.length,
         migratedCount: migrated,
-        oomKills: stats.oomKills,
-        oomGroupKills: stats.oomGroupKills,
-        toolOomKills: toolStats.oomKills,
-        serverOomKills: serverStats.oomKills,
         cpuController: managed.cpuController,
-        ...(stats.currentBytes !== undefined ? { currentBytes: stats.currentBytes } : {}),
-        ...(stats.peakBytes !== undefined ? { peakBytes: stats.peakBytes } : {}),
-        ...(stats.pressureSomeTotal !== undefined
-          ? { pressureSomeTotal: stats.pressureSomeTotal }
-          : {}),
-        ...(stats.pressureFullTotal !== undefined
-          ? { pressureFullTotal: stats.pressureFullTotal }
-          : {}),
-        ...(stats.memoryMaxEvents !== undefined ? { memoryMaxEvents: stats.memoryMaxEvents } : {}),
-        ...(stats.memoryOomEvents !== undefined ? { memoryOomEvents: stats.memoryOomEvents } : {}),
-        ...(stats.cpuUsageUsec !== undefined ? { cpuUsageUsec: stats.cpuUsageUsec } : {}),
-        ...(stats.cpuThrottledUsec !== undefined
-          ? { cpuThrottledUsec: stats.cpuThrottledUsec }
-          : {}),
-        ...(stats.cpuThrottleCount !== undefined
-          ? { cpuThrottleCount: stats.cpuThrottleCount }
-          : {}),
-        ...(stats.ioReadBytes !== undefined ? { ioReadBytes: stats.ioReadBytes } : {}),
-        ...(stats.ioWriteBytes !== undefined ? { ioWriteBytes: stats.ioWriteBytes } : {}),
-        ...(toolStats.cpuUsageUsec !== undefined
-          ? { toolCpuUsageUsec: toolStats.cpuUsageUsec }
-          : {}),
-        ...(serverStats.cpuUsageUsec !== undefined
-          ? { serverCpuUsageUsec: serverStats.cpuUsageUsec }
-          : {}),
-        ...(toolStats.ioReadBytes !== undefined ? { toolIoReadBytes: toolStats.ioReadBytes } : {}),
-        ...(toolStats.ioWriteBytes !== undefined
-          ? { toolIoWriteBytes: toolStats.ioWriteBytes }
-          : {}),
+        ...workloadStatsFields({ parent: stats, tools: toolStats, server: serverStats }),
       });
     } catch {
       workloadReporter?.emit(path.basename(group.directory), {
@@ -882,6 +860,23 @@ export function createOwnedProcessScope(placement?: WorkloadPlacement): OwnedPro
       if (!attempted) {
         attempted = true;
         group = activePlacement ? createManagedCgroup(activePlacement) : createCgroup();
+        const protection = group?.managed?.serverProtection;
+        if (group && protection) {
+          workloadReporter?.emit(
+            path.basename(group.directory),
+            protection.ok
+              ? {
+                  phase: 'completed',
+                  workloadPhase: 'protection',
+                  serverMinBytes: protection.bytes,
+                }
+              : {
+                  phase: 'failed',
+                  workloadPhase: 'protection',
+                  workloadFailure: protection.failure,
+                }
+          );
+        }
       }
       if (activePlacement && !group) {
         workloadReporter?.emit(undefined, {
