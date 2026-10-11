@@ -1,10 +1,7 @@
 import 'server-only';
 
 import { z } from 'zod';
-import {
-  GITEA_CLIENT_ID,
-  GITEA_CLIENT_SECRET,
-} from '@kilocode/web-shared/lib/config.server';
+import { GITEA_CLIENT_ID, GITEA_CLIENT_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { GiteaRepositorySchema, type GiteaRepository } from './metadata';
 
 const GITEA_AUTHORIZE_URL = '/login/oauth/authorize';
@@ -15,13 +12,21 @@ const GITEA_DEFAULT_INSTANCE_URL = 'https://gitea.com';
 const MAX_GITEA_REPOSITORY_PAGES = 20;
 const GITEA_PAGE_SIZE = 50;
 
+const NonEmptyOAuthTokenSchema = z
+  .string()
+  .min(1)
+  .refine(value => value.trim() === value);
+
 const GiteaOAuthTokenSchema = z
   .object({
-    access_token: z.string().min(1),
-    token_type: z.string().transform(v => v.toLowerCase()).pipe(z.literal('bearer')),
+    access_token: NonEmptyOAuthTokenSchema,
+    token_type: z
+      .string()
+      .transform(v => v.toLowerCase())
+      .pipe(z.literal('bearer')),
     scope: z.string().optional(),
     expires_in: z.number().int().positive().optional(),
-    refresh_token: z.string().optional(),
+    refresh_token: NonEmptyOAuthTokenSchema.optional(),
   })
   .strict();
 
@@ -116,8 +121,8 @@ export async function exchangeGiteaOAuthCode(
     accessToken: parsed.data.access_token,
     tokenType: 'bearer',
     scope: parsed.data.scope,
-    expiresIn: parsed.data.expiresIn,
-    refreshToken: parsed.data.refreshToken,
+    expiresIn: parsed.data.expires_in,
+    refreshToken: parsed.data.refresh_token,
   };
 }
 

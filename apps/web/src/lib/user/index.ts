@@ -2146,6 +2146,10 @@ export function inferRowlessAuthProviders(
       return ['github'];
     case hosted_domain_specials.gitlab:
       return ['gitlab'];
+    case hosted_domain_specials.gitea:
+      return ['gitea'];
+    case hosted_domain_specials.forgejo:
+      return ['forgejo'];
     case hosted_domain_specials.linkedin:
       return ['linkedin'];
     case hosted_domain_specials.discord:

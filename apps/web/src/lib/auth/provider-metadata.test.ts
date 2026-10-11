@@ -1,4 +1,6 @@
 import { describe, expect, test } from '@jest/globals';
+import { ForgejoLogo } from '@/components/auth/ForgejoLogo';
+import { GiteaLogo } from '@/components/auth/GiteaLogo';
 import { OpenAILogo } from '@/components/auth/OpenAILogo';
 import {
   AllAuthMethodIds,
@@ -38,5 +40,20 @@ describe('OpenAI provider metadata', () => {
 
   test('uses the OpenAI logo for the ChatGPT sign-in icon', () => {
     expect((getProviderById('openai').icon as { type?: unknown }).type).toBe(OpenAILogo);
+  });
+});
+
+describe('Gitea and Forgejo provider metadata', () => {
+  it.each([
+    { id: 'gitea', name: 'Gitea', Logo: GiteaLogo },
+    { id: 'forgejo', name: 'Forgejo', Logo: ForgejoLogo },
+  ])('defines $name as a linkable OAuth sign-in method', ({ id, name, Logo }) => {
+    expect(AuthProviderIdSchema.parse(id)).toBe(id);
+    expect(getProviderById(id)).toMatchObject({ id, name });
+    expect(LinkableAuthProviders.some(provider => provider.id === id)).toBe(true);
+    expect(OAuthProviderIds).toContain(id);
+    expect(ProdNonSSOAuthProviders).toContain(id);
+    expect(AllAuthMethodIds).toContain(id);
+    expect((getProviderById(id).icon as { type?: unknown }).type).toBe(Logo);
   });
 });

@@ -4,6 +4,8 @@ import type { PlatformIntegrationSetupStatus } from '@/lib/integrations/platform
 export type PlatformType =
   | 'github'
   | 'gitlab'
+  | 'gitea'
+  | 'forgejo'
   | 'bitbucket'
   | 'slack'
   | 'discord'
@@ -84,6 +86,24 @@ export const PLATFORM_DEFINITIONS: PlatformDefinition[] = [
     enabled: true,
     personalRoute: '/integrations/dolthub',
     orgRoute: organizationId => `/organizations/${organizationId}/integrations/dolthub`,
+  },
+  {
+    id: PLATFORM.GITEA,
+    name: 'Gitea',
+    description:
+      'Connect your Gitea repositories to enable AI code reviews and Cloud Agent sessions',
+    enabled: true,
+    personalRoute: '/integrations/gitea',
+    orgRoute: organizationId => `/organizations/${organizationId}/integrations/gitea`,
+  },
+  {
+    id: PLATFORM.FORGEJO,
+    name: 'Forgejo',
+    description:
+      'Connect your Forgejo repositories to enable AI code reviews and Cloud Agent sessions',
+    enabled: true,
+    personalRoute: '/integrations/forgejo',
+    orgRoute: organizationId => `/organizations/${organizationId}/integrations/forgejo`,
   },
   {
     id: PLATFORM.BITBUCKET,

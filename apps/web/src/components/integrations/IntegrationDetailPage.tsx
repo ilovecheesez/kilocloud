@@ -86,6 +86,42 @@ const integrationDetailRegistry = {
       return <BitbucketIntegrationDetails organizationId={organizationId} error={search.error} />;
     },
   },
+  [PLATFORM.GITEA]: {
+    title: 'Gitea Integration',
+    userSubtitle: 'Manage your personal Gitea integration',
+    organizationSubtitle: organizationName =>
+      `Manage Gitea OAuth integration for ${organizationName}`,
+    render: async ({ organizationId, search }) => {
+      const { SelfHostedGitIntegrationDetails } =
+        await import('@/components/integrations/SelfHostedGitIntegrationDetails');
+      return (
+        <SelfHostedGitIntegrationDetails
+          platform={PLATFORM.GITEA}
+          organizationId={organizationId}
+          success={search.success === 'connected'}
+          error={search.error}
+        />
+      );
+    },
+  },
+  [PLATFORM.FORGEJO]: {
+    title: 'Forgejo Integration',
+    userSubtitle: 'Manage your personal Forgejo integration',
+    organizationSubtitle: organizationName =>
+      `Manage Forgejo OAuth integration for ${organizationName}`,
+    render: async ({ organizationId, search }) => {
+      const { SelfHostedGitIntegrationDetails } =
+        await import('@/components/integrations/SelfHostedGitIntegrationDetails');
+      return (
+        <SelfHostedGitIntegrationDetails
+          platform={PLATFORM.FORGEJO}
+          organizationId={organizationId}
+          success={search.success === 'connected'}
+          error={search.error}
+        />
+      );
+    },
+  },
   [PLATFORM.SLACK]: {
     title: 'Slack Integration',
     userSubtitle: 'Connect your Slack workspace to receive notifications',

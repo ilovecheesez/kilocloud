@@ -3,52 +3,33 @@ import 'server-only';
 import { and, eq, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 import { platform_integrations, platform_oauth_credentials } from '@kilocode/db/schema';
-import { GiteaOAuthCredentialRowSchema } from '@kilocode/worker-utils/gitea-workspace-access-token';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { after } from 'next/server';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import type { Owner } from '@/lib/integrations/core/types';
-import {
-  GiteaIntegrationMetadataSchema,
-  GiteaRepositorySchema,
-  type GiteaRepository,
-} from './metadata';
+import { GiteaIntegrationMetadataSchema, GiteaRepositoryMetadataSchema } from './metadata';
 
-const CachedGiteaRepositorySchema = z
-  .object({
-    id: z.string().min(1),
-    name: z.string().min(1),
-    full_name: z.string().min(3),
-    private: z.boolean(),
-    default_branch: z.string().min(1).optional(),
-  })
-  .strict();
-
-export const CachedGiteaRepositoryListResultSchema = z.discriminatedUnion('status', [
+export const GiteaRepositoryListResultSchema = z.discriminatedUnion('status', [
   z
     .object({
       status: z.literal('available'),
-      repositories: z.array(GiteaRepositorySchema),
+      repositories: z.array(GiteaRepositoryMetadataSchema),
       syncedAt: z.iso.datetime(),
     })
     .strict(),
   z.object({ status: z.literal('not_connected') }).strict(),
-  z.object({ status: z.literal('workspace_selection_required') }).strict(),
+  z.object({ status: z.literal('repository_selection_required') }).strict(),
   z.object({ status: z.literal('reconnect_required') }).strict(),
-  z.object({ status: z.literal('insufficient_permissions') }).strict(),
   z.object({ status: z.literal('temporarily_unavailable') }).strict(),
   z.object({ status: z.literal('invalid_request') }).strict(),
 ]);
 
-export type CachedGiteaRepositoryListResult = z.infer<
-  typeof CachedGiteaRepositoryListResultSchema
->;
+export type GiteaRepositoryListResult = z.infer<typeof GiteaRepositoryListResultSchema>;
 
 type ListGiteaRepositoriesInput = {
   owner: Owner;
   kiloUserId: string;
-  forceRefresh?: boolean;
   expectedIntegrationId?: string;
 };
 
@@ -67,33 +48,10 @@ function ownerCondition(owner: Owner) {
     : eq(platform_integrations.owned_by_organization_id, owner.id);
 }
 
-function readCachedRepositories(
-  value: unknown,
-  syncedAt: string | null,
-  repository: GiteaRepository
-): Extract<CachedGiteaRepositoryListResult, { status: 'available' }> | null {
-  if (value === null || !syncedAt) return null;
-  const repositories = z.array(CachedGiteaRepositorySchema).safeParse(value);
-  if (!repositories.success) return null;
-  return {
-    status: 'available',
-    repositories: repositories.data.map(repository => ({
-      id: repository.id,
-      name: repository.name,
-      fullName: repository.full_name,
-      private: repository.private,
-      defaultBranch: repository.default_branch,
-    })),
-    syncedAt: new Date(syncedAt).toISOString(),
-  };
-}
-
 export async function listGiteaRepositories({
   owner,
-  kiloUserId,
-  forceRefresh = false,
   expectedIntegrationId,
-}: ListGiteaRepositoriesInput): Promise<CachedGiteaRepositoryListResult> {
+}: ListGiteaRepositoriesInput): Promise<GiteaRepositoryListResult> {
   const [row] = await db
     .select({
       integrationId: platform_integrations.id,
@@ -104,7 +62,7 @@ export async function listGiteaRepositories({
       metadata: platform_integrations.metadata,
       repositories: platform_integrations.repositories,
       repositoriesSyncedAt: platform_integrations.repositories_synced_at,
-      credential: platform_oauth_credentials,
+      revokedAt: platform_oauth_credentials.revoked_at,
     })
     .from(platform_integrations)
     .leftJoin(
@@ -118,48 +76,49 @@ export async function listGiteaRepositories({
   if (expectedIntegrationId && row.integrationId !== expectedIntegrationId) {
     return { status: 'temporarily_unavailable' };
   }
-  const credential = GiteaOAuthCredentialRowSchema.safeParse(row.credential);
-  if (!credential.success || credential.data.revoked_at) {
+  if (row.revokedAt) {
     return { status: 'reconnect_required' };
   }
 
   const metadata = GiteaIntegrationMetadataSchema.safeParse(row.metadata);
   if (!metadata.success) return { status: 'reconnect_required' };
+
   if (
     row.integrationStatus === INTEGRATION_STATUS.PENDING &&
-    metadata.data.state === 'workspace_selection_required'
+    metadata.data.state === 'repository_selection_required'
   ) {
-    return { status: 'workspace_selection_required' };
+    return { status: 'repository_selection_required' };
   }
+
   if (
     row.integrationStatus !== INTEGRATION_STATUS.ACTIVE ||
     metadata.data.state !== 'active' ||
-    row.installationId !== metadata.data.repository.id ||
-    row.accountId !== metadata.data.repository.id ||
-    row.accountLogin !== metadata.data.repository.fullName
+    row.installationId !== String(metadata.data.repository.id) ||
+    row.accountId !== String(metadata.data.repository.id) ||
+    row.accountLogin !== metadata.data.repository.full_name
   ) {
     return { status: 'reconnect_required' };
   }
 
-  const cachedResult = readCachedRepositories(
-    row.repositories,
-    row.repositoriesSyncedAt,
-    metadata.data.repository
-  );
-  if (!forceRefresh && cachedResult) return cachedResult;
+  const syncedAt = row.repositoriesSyncedAt
+    ? new Date(row.repositoriesSyncedAt).toISOString()
+    : null;
 
-  // Repository fetching would be triggered from the worker via token-service-client
-  // For now, return cached state with a note
+  const stored = z.array(GiteaRepositoryMetadataSchema).safeParse(row.repositories);
+  const repositories =
+    stored.success && stored.data.length > 0 ? stored.data : [metadata.data.repository];
+
+  // The OAuth token is stored encrypted under a key only the git-token-service
+  // holds, so this cache reads what the connect flow already captured instead of
+  // re-fetching the provider with the stored credential.
   return {
     status: 'available',
-    repositories: metadata.data.repositories,
-    syncedAt: new Date().toISOString(),
+    repositories,
+    syncedAt: syncedAt ?? new Date().toISOString(),
   };
 }
 
-export function scheduleGiteaRepositoryCachePrime(
-  input: PrimeGiteaRepositoryCacheInput
-): void {
+export function scheduleGiteaRepositoryCachePrime(input: PrimeGiteaRepositoryCacheInput): void {
   after(() => primeGiteaRepositoryCache(input));
 }
 
@@ -172,7 +131,6 @@ export async function primeGiteaRepositoryCache({
     const result = await listGiteaRepositories({
       owner,
       kiloUserId,
-      forceRefresh: true,
       expectedIntegrationId: integrationId,
     });
     if (result.status !== 'available') {

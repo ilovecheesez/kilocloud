@@ -142,6 +142,14 @@ The connection-role migration preserves a sole eligible connection, prefers an u
 - `GOOGLE_SHEETS_SPREADSHEET_ID` - ID of the Google Sheet used for specific app integrations. [SERVER]
 - `GITLAB_CLIENT_ID` - GitLab OAuth app client ID. `[PUBLIC]`
 - `GITLAB_CLIENT_SECRET` - GitLab OAuth app client secret. `[SECRET]`
+- `GITEA_CLIENT_ID` - Gitea OAuth app client ID, used for both Gitea sign-in and repository integration. `[PUBLIC]`
+- `GITEA_CLIENT_SECRET` - Gitea OAuth app client secret. `[SECRET]`
+- `GITEA_OAUTH_CREDENTIAL_ACTIVE_KEY_ID` - Active Gitea platform-credential envelope key ID. `[SECRET]`
+- `GITEA_OAUTH_CREDENTIAL_ACTIVE_PUBLIC_KEY` - Base64-encoded active Gitea platform-credential RSA public key; mirrors the Bitbucket envelope key pattern. `[SECRET]`
+- `FORGEJO_CLIENT_ID` - Forgejo OAuth app client ID, used for both Forgejo sign-in and repository integration. `[PUBLIC]`
+- `FORGEJO_CLIENT_SECRET` - Forgejo OAuth app client secret. `[SECRET]`
+- `FORGEJO_OAUTH_CREDENTIAL_ACTIVE_KEY_ID` - Active Forgejo platform-credential envelope key ID. `[SECRET]`
+- `FORGEJO_OAUTH_CREDENTIAL_ACTIVE_PUBLIC_KEY` - Base64-encoded active Forgejo platform-credential RSA public key; mirrors the Bitbucket envelope key pattern. `[SECRET]`
 - `BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_KEY_ID` - Active platform-credential envelope key ID. The legacy name is shared by Bitbucket and encrypted GitLab credentials. [SERVER]
 - `BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_PUBLIC_KEY` - Base64-encoded active platform-credential RSA public key; available to web and `git-token-service`. The legacy name is shared by Bitbucket and GitLab. `[SECRET]`
 - `BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_PRIVATE_KEY` - Base64-encoded active platform-credential RSA private key; available only to `git-token-service`. The legacy name is shared by Bitbucket and GitLab. `[SECRET]`

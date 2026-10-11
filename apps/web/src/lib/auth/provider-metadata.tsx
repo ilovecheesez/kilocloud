@@ -1,8 +1,10 @@
 import { AppleLogo } from '@/components/auth/AppleLogo';
 import { AnacondaLogo } from '@/components/auth/AnacondaLogo';
 import { DiscordLogo } from '@/components/auth/DiscordLogo';
+import { ForgejoLogo } from '@/components/auth/ForgejoLogo';
 import { GitHubLogo } from '@/components/auth/GitHubLogo';
 import { GitLabLogo } from '@/components/auth/GitLabLogo';
+import { GiteaLogo } from '@/components/auth/GiteaLogo';
 import { GoogleLogo } from '@/components/auth/GoogleLogo';
 import { LinkedInLogo } from '@/components/auth/LinkedInLogo';
 import { OpenAILogo } from '@/components/auth/OpenAILogo';
@@ -31,6 +33,8 @@ const AllAuthProviders = [
   { id: 'google', name: 'Google', icon: <GoogleLogo /> },
   { id: 'github', name: 'GitHub', icon: <GitHubLogo /> },
   { id: 'gitlab', name: 'GitLab', icon: <GitLabLogo className="size-5" /> },
+  { id: 'gitea', name: 'Gitea', icon: <GiteaLogo className="size-5" /> },
+  { id: 'forgejo', name: 'Forgejo', icon: <ForgejoLogo className="size-5" /> },
   { id: 'linkedin', name: 'LinkedIn', icon: <LinkedInLogo /> },
   { id: 'discord', name: 'Discord', icon: <DiscordLogo /> },
   {

@@ -21,7 +21,7 @@ import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { ForgejoOAuthTokens, ForgejoUser } from './adapter';
 import {
   ForgejoIntegrationMetadataSchema,
-  ForgejoRepositorySchema,
+  ForgejoRepositoryMetadataSchema,
   type ForgejoRepository,
 } from './metadata';
 
@@ -68,25 +68,26 @@ export async function storeForgejoIntegration(input: StoreForgejoIntegrationInpu
   const integrationId = randomUUID();
   const credentialId = randomUUID();
   const providerSubjectId = String(input.forgejoUser.id);
-  const selectedRepository = input.repositories.length === 1 ? input.repositories[0] : undefined;
-  const repositoryList = input.repositories.map(repository => ({
-    id: String(repository.id),
-    name: repository.name,
-    fullName: repository.full_name,
-    private: repository.private,
-    defaultBranch: repository.default_branch,
-  }));
+  const repositoryList = input.repositories.map(repository =>
+    ForgejoRepositoryMetadataSchema.parse({
+      id: repository.id,
+      name: repository.name,
+      full_name: repository.full_name,
+      private: repository.private,
+      default_branch: repository.default_branch,
+      html_url: repository.html_url,
+      ssh_url: repository.ssh_url,
+      clone_url: repository.clone_url,
+    })
+  );
+  const selectedRepository = repositoryList.length === 1 ? repositoryList[0] : undefined;
   const metadata = selectedRepository
-    ? ForgejoIntegrationMetadataSchema.parse({
-        state: 'active',
-        repository: repositoryList[0],
-      })
+    ? ForgejoIntegrationMetadataSchema.parse({ state: 'active', repository: selectedRepository })
     : ForgejoIntegrationMetadataSchema.parse({
         state: 'repository_selection_required',
         repositories: repositoryList,
       });
-  const encryptionKey = requireCredentialEncryptionKey();
-  const accessTokenExpiresAt = new Date(Date.now() + input.tokens.expiresIn * 1000).toISOString();
+  const encryptionKey = requireForgejoCredentialEncryptionKey();
   const accessTokenEncrypted = encryptKeyedEnvelope(
     input.tokens.accessToken,
     FORGEJO_OAUTH_CREDENTIAL_ENVELOPE_SCHEME,
@@ -99,18 +100,20 @@ export async function storeForgejoIntegration(input: StoreForgejoIntegrationInpu
       kind: 'access',
     })
   );
-  const refreshTokenEncrypted = encryptKeyedEnvelope(
-    input.tokens.refreshToken,
-    FORGEJO_OAUTH_CREDENTIAL_ENVELOPE_SCHEME,
-    encryptionKey,
-    buildForgejoOAuthCredentialAad({
-      credentialId,
-      integrationId,
-      owner: input.owner,
-      authorizedByUserId: input.authorizedByUserId,
-      kind: 'refresh',
-    })
-  );
+  const refreshTokenEncrypted = input.tokens.refreshToken
+    ? encryptKeyedEnvelope(
+        input.tokens.refreshToken,
+        FORGEJO_OAUTH_CREDENTIAL_ENVELOPE_SCHEME,
+        encryptionKey,
+        buildForgejoOAuthCredentialAad({
+          credentialId,
+          integrationId,
+          owner: input.owner,
+          authorizedByUserId: input.authorizedByUserId,
+          kind: 'refresh',
+        })
+      )
+    : null;
   const credentialValues: NewPlatformOAuthCredential = {
     id: credentialId,
     platform_integration_id: integrationId,
@@ -118,7 +121,6 @@ export async function storeForgejoIntegration(input: StoreForgejoIntegrationInpu
     provider_subject_id: providerSubjectId,
     provider_subject_login: input.forgejoUser.login,
     access_token_encrypted: accessTokenEncrypted,
-    access_token_expires_at: accessTokenExpiresAt,
     refresh_token_encrypted: refreshTokenEncrypted,
   };
 
@@ -132,7 +134,10 @@ export async function storeForgejoIntegration(input: StoreForgejoIntegrationInpu
         .select({ isAdmin: kilocode_users.is_admin })
         .from(kilocode_users)
         .where(
-          and(eq(kilocode_users.id, input.authorizedByUserId), isNull(kilocode_users.blocked_reason))
+          and(
+            eq(kilocode_users.id, input.authorizedByUserId),
+            isNull(kilocode_users.blocked_reason)
+          )
         )
         .for('update');
       if (!authorizer) {
@@ -164,9 +169,7 @@ export async function storeForgejoIntegration(input: StoreForgejoIntegrationInpu
     const [currentIntegration] = await tx
       .select({ id: platform_integrations.id })
       .from(platform_integrations)
-      .where(
-        and(ownerCondition(input.owner), eq(platform_integrations.platform, PLATFORM.FORGEJO))
-      )
+      .where(and(ownerCondition(input.owner), eq(platform_integrations.platform, PLATFORM.FORGEJO)))
       .for('update');
     if (currentIntegration) {
       throw new ForgejoIntegrationConnectionConflictError();
@@ -179,16 +182,19 @@ export async function storeForgejoIntegration(input: StoreForgejoIntegrationInpu
       created_by_user_id: input.authorizedByUserId,
       platform: PLATFORM.FORGEJO,
       integration_type: 'oauth',
-      platform_installation_id: selectedRepository?.id ?? null,
-      platform_account_id: selectedRepository?.id ?? null,
-      platform_account_login: selectedRepository?.fullName ?? null,
+      platform_installation_id: selectedRepository ? String(selectedRepository.id) : null,
+      platform_account_id: selectedRepository ? String(selectedRepository.id) : null,
+      platform_account_login: selectedRepository ? selectedRepository.full_name : null,
       permissions: null,
       scopes: [
-        ...(input.tokens.scope?.split(' ') ?? []),
-        'read:repository',
-        'write:repository',
-        'read:user',
-        'write:user',
+        ...new Set(
+          [
+            ...(input.tokens.scope?.split(/\s+/) ?? []),
+            'read:user',
+            'read:repository',
+            'write:repository',
+          ].filter(Boolean)
+        ),
       ],
       repository_access: selectedRepository ? 'all' : 'selected',
       repositories: selectedRepository ? null : repositoryList,
@@ -203,7 +209,7 @@ export async function storeForgejoIntegration(input: StoreForgejoIntegrationInpu
   });
 }
 
-function requireCredentialEncryptionKey(): { keyId: string; publicKeyPem: Buffer } {
+function requireForgejoCredentialEncryptionKey(): { keyId: string; publicKeyPem: Buffer } {
   const keyId = FORGEJO_OAUTH_CREDENTIAL_ACTIVE_KEY_ID;
   const encodedPublicKey = FORGEJO_OAUTH_CREDENTIAL_ACTIVE_PUBLIC_KEY;
   if (!keyId || keyId.trim() !== keyId || !encodedPublicKey) {

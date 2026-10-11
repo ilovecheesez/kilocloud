@@ -47,6 +47,7 @@ import { linkAccountToExistingUser } from '@/lib/user';
 import { whenOk } from '@kilocode/web-shared/lib/maybe-result';
 import type { AuthErrorType } from '@kilocode/web-shared/lib/auth/constants';
 import { hosted_domain_specials } from '@kilocode/web-shared/lib/auth/constants';
+import { parseGiteaLikeProfile } from '@/lib/auth/gitea-like-profile';
 import { authFailureRedirectUrl, ssoSignInRedirectUrl } from '@/lib/auth/redirect-urls';
 import { isValidCallbackPath } from '@/lib/getSignInCallbackUrl';
 import {
@@ -84,6 +85,10 @@ import {
   NEXTAUTH_URL,
   GITLAB_CLIENT_ID,
   GITLAB_CLIENT_SECRET,
+  GITEA_CLIENT_ID,
+  GITEA_CLIENT_SECRET,
+  FORGEJO_CLIENT_ID,
+  FORGEJO_CLIENT_SECRET,
   DISCORD_OAUTH_CLIENT_ID,
   DISCORD_OAUTH_CLIENT_SECRET,
   APPLE_CLIENT_ID,
@@ -571,6 +576,44 @@ function createPasskeyAccountInfo(
   };
 }
 
+function createGiteaAccountInfo(
+  account: Account,
+  user: NextUser | AdapterUser
+): CreateOrUpdateUserArgs | null {
+  if (account.provider !== PLATFORM.GITEA) return null;
+  assert(user.email, 'User email is required for Gitea auth');
+  assert(user.name, 'User name is required for Gitea auth');
+
+  return {
+    google_user_email: user.email,
+    google_user_name: user.name || '',
+    hosted_domain: hosted_domain_specials.gitea,
+    google_user_image_url: user.image || '',
+    provider: account.provider,
+    provider_account_id: account.providerAccountId,
+    display_name: null,
+  };
+}
+
+function createForgejoAccountInfo(
+  account: Account,
+  user: NextUser | AdapterUser
+): CreateOrUpdateUserArgs | null {
+  if (account.provider !== PLATFORM.FORGEJO) return null;
+  assert(user.email, 'User email is required for Forgejo auth');
+  assert(user.name, 'User name is required for Forgejo auth');
+
+  return {
+    google_user_email: user.email,
+    google_user_name: user.name || '',
+    hosted_domain: hosted_domain_specials.forgejo,
+    google_user_image_url: user.image || '',
+    provider: account.provider,
+    provider_account_id: account.providerAccountId,
+    display_name: null,
+  };
+}
+
 function createAccountInfo(
   account: Account,
   user: NextUser | AdapterUser,
@@ -583,6 +626,8 @@ function createAccountInfo(
     createAppleAccountInfo(account, user) ??
     createGitHubAccountInfo(account, user, profile) ??
     createGitlabAccountInfo(account, user) ??
+    createGiteaAccountInfo(account, user) ??
+    createForgejoAccountInfo(account, user) ??
     createLinkedInAccountInfo(account, user) ??
     createDiscordAccountInfo(account, user) ??
     createEmailAccountInfo(account, user) ??
@@ -778,6 +823,52 @@ const openAiProvider: OAuthConfig<Profile> & { callbackUrl: string } = {
   profile: parseOpenAiProfile,
 };
 
+const GITEA_LIKE_OAUTH_SCOPE = 'read:user read:repository write:repository';
+
+// next-auth v4 only forwards the `url` of an endpoint OBJECT into the Issuer
+// metadata — a bare-string endpoint is silently ignored — so every endpoint must
+// use the object form. Discovery (`wellKnown`) is deliberately not used: Gitea
+// serves it, but a public Forgejo instance answers 404, and both platforms are
+// self-hostable, so an explicit endpoint set keeps one deterministic path.
+// `client_secret_post` is the documented Gitea/Forgejo token-exchange contract
+// (openid-client would otherwise default to HTTP Basic), and the REST user
+// endpoint returns the same shape the platform adapter parses.
+const giteaProvider: OAuthConfig<Profile> & { id: string } = {
+  id: PLATFORM.GITEA,
+  name: 'Gitea',
+  type: 'oauth',
+  issuer: 'https://gitea.com',
+  authorization: {
+    url: 'https://gitea.com/login/oauth/authorize',
+    params: { scope: GITEA_LIKE_OAUTH_SCOPE },
+  },
+  token: { url: 'https://gitea.com/login/oauth/access_token' },
+  userinfo: { url: 'https://gitea.com/api/v1/user' },
+  client: { token_endpoint_auth_method: 'client_secret_post' },
+  checks: ['pkce', 'state'],
+  clientId: GITEA_CLIENT_ID ?? '',
+  clientSecret: GITEA_CLIENT_SECRET ?? '',
+  profile: parseGiteaLikeProfile,
+};
+
+const forgejoProvider: OAuthConfig<Profile> & { id: string } = {
+  id: PLATFORM.FORGEJO,
+  name: 'Forgejo',
+  type: 'oauth',
+  issuer: 'https://forgejo.org',
+  authorization: {
+    url: 'https://forgejo.org/login/oauth/authorize',
+    params: { scope: GITEA_LIKE_OAUTH_SCOPE },
+  },
+  token: { url: 'https://forgejo.org/login/oauth/access_token' },
+  userinfo: { url: 'https://forgejo.org/api/v1/user' },
+  client: { token_endpoint_auth_method: 'client_secret_post' },
+  checks: ['pkce', 'state'],
+  clientId: FORGEJO_CLIENT_ID ?? '',
+  clientSecret: FORGEJO_CLIENT_SECRET ?? '',
+  profile: parseGiteaLikeProfile,
+};
+
 export const authOptions: NextAuthOptions = {
   ...sessionAuthOptions,
   cookies: {
@@ -830,6 +921,8 @@ export const authOptions: NextAuthOptions = {
       clientId: GITLAB_CLIENT_ID,
       clientSecret: GITLAB_CLIENT_SECRET,
     }),
+    giteaProvider,
+    forgejoProvider,
     DiscordProvider({
       clientId: DISCORD_OAUTH_CLIENT_ID ?? '',
       clientSecret: DISCORD_OAUTH_CLIENT_SECRET ?? '',

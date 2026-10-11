@@ -5,6 +5,8 @@ export const SETUP_STATUS_PLATFORMS = [
   PLATFORM.SLACK,
   PLATFORM.DISCORD,
   PLATFORM.GITHUB,
+  PLATFORM.GITEA,
+  PLATFORM.FORGEJO,
   PLATFORM.GITLAB,
   PLATFORM.BITBUCKET,
   PLATFORM.LINEAR,
@@ -43,6 +45,8 @@ function buildInstallationSummary(
   if (
     integration.platform === PLATFORM.GITHUB ||
     integration.platform === PLATFORM.GITLAB ||
+    integration.platform === PLATFORM.GITEA ||
+    integration.platform === PLATFORM.FORGEJO ||
     integration.platform === PLATFORM.BITBUCKET ||
     integration.platform === PLATFORM.DOLTHUB
   ) {
